@@ -11,6 +11,7 @@ from PIL import Image
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
 
+from deepforest.visualize import plot_predictions
 import numpy as np
 
 from deepforest import main
@@ -33,62 +34,37 @@ model = main.deepforest()
 model.use_release()
 
 @_api_app.post("/recognize")
-async def recoginze(
-        file: UploadFile
-    ):
+async def recoginze(file: UploadFile):
     try:
+        model = main.deepforest()
+        model.use_release()
+
         file_content = await file.read()
 
-        image = Image.open(io.BytesIO(file_content))
-        if image.mode in ("RGBA", "P"):
-            image = image.convert("RGB")
-        # image.save('orig.jpg', 'JPEG', quality=50)
-        print(image.format, image.size, image.mode)
-
-        # rcParams['figure.figsize'] = 1, 1
-
+        image = Image.open(io.BytesIO(file_content)).convert("RGB")
         numpydata = np.asarray(image)
 
         boxes = model.predict_image(numpydata)
-        boxes.head()
 
         if len(boxes):
             boxes_count = len(boxes)
         else:
             boxes_count = -1
 
-        plot = model.predict_image(numpydata, return_plot=True, thickness=3)
+        draw_image = np.asarray(image.copy())
+        draw_image = plot_predictions(draw_image, boxes, thickness=3)
+        draw_image = Image.fromarray(draw_image)
 
-        fig, axs = plt.subplots()
-        axs.imshow(plot[:,:,::-1])
-        # axs.set_title(f"Количество деревьев на изображении: {boxes_count}")
-        axs.set_xticks([])
-        axs.set_yticks([])
-
-        # plt.show()
-
-        with io.BytesIO() as buff:
-            fig.savefig(buff, format='raw')
-            buff.seek(0)
-            data = np.frombuffer(buff.getvalue(), dtype=np.uint8)
-        w, h = fig.canvas.get_width_height()
-        bytes_img = data.reshape((int(h), int(w), -1))
-
-        result_image = Image.fromarray(bytes_img).convert('RGB')
-        result_image.save('out.jpg', 'JPEG', quality=100)
-        
         with io.BytesIO() as buf:
-            result_image.save(buf, format='JPEG')
+            draw_image.save(buf, format="JPEG")
             im_bytes = buf.getvalue()
-        
-        headers = {'DF-Filename': file.filename, 'DF-Boxes-Count': str(boxes_count)}
-        # headers = {'Content-Disposition': 'inline; filename="test.png"'}
+
+        headers = {'df-filename': file.filename, 'df-boxes-count': str(boxes_count)}
         return Response(im_bytes, headers=headers, media_type='image/jpeg')
     except Exception as e:
         print(e)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal error"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal error"
         )
     finally:
         file.file.close()

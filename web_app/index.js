@@ -56,18 +56,18 @@ $(() => {
         getData(formData)
             .then((response) => {
                 progressBarUploadDiv.hide()
-                goBackBtn.show();
                 const treeCount = response.headers["df-boxes-count"];
                 const urlCreator = window.URL || window.webkitURL;
                 const imageUrl = urlCreator.createObjectURL(response.data);
                 const img = new Image();
-                img.onload = function () {
-                    result.empty();
-                    result.append(`<p>Количество деревьев на изображении: ${treeCount}</p>`);
-                    result.append(img);
-                    submitBtn.prop("disabled", false);
-                };
+                result.empty();
+                result.append(`<p>Количество деревьев на изображении: ${treeCount}</p>`);
+                console.log(img)
                 img.src = imageUrl;
+                img.className = "img-fluid";
+                result.append(img);
+                submitBtn.prop("disabled", false);
+                goBackBtn.show();
             })
             .catch(function (error) {
                 console.error("Произошла ошибка: " + error);
